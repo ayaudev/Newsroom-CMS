@@ -1,9 +1,19 @@
+import { useState } from 'react';
+import { toast } from 'react-toastify';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
-import { FiHome, FiFileText, FiPlusCircle, FiSettings, FiArrowLeft } from 'react-icons/fi';
+import { FiHome, FiFileText, FiPlusCircle, FiSettings, FiArrowLeft, FiLogOut } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 
 const AdminLayout = () => {
-  const { isAdmin, user, loading } = useAuth();
+  const { isAdmin, user, loading, logout } = useAuth();
+
+  const [loggingOut, setLoggingOut] = useState(false);
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try { await logout(); }
+    catch { toast.error('Не удалось завершить сеанс. Повторите попытку.'); }
+    finally { setLoggingOut(false); }
+  };
 
   if (loading) return <div className="p-8">Загрузка...</div>;
   if (!isAdmin) {
@@ -54,6 +64,7 @@ const AdminLayout = () => {
               <FiArrowLeft size={20} />
               Перейти на сайт
             </NavLink>
+            <button disabled={loggingOut} onClick={handleLogout} className="flex items-center gap-3 text-gray-400 hover:text-white mt-4"><FiLogOut size={20} />{loggingOut ? 'Выход...' : 'Выйти'}</button>
           </div>
         </aside>
 

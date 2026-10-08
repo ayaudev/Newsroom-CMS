@@ -7,3 +7,5 @@ exports.findByEmail = async email => (await query('SELECT '+fields+', password F
 exports.create = async ({name,email,password,role='user'}) => (await query('INSERT INTO users(id,name,email,password,role) VALUES($1,$2,$3,$4,$5) RETURNING '+fields,[randomUUID(),name.trim(),email.trim().toLowerCase(),await bcrypt.hash(password,12),role])).rows[0];
 exports.update = async (id,{name,avatar}) => (await query('UPDATE users SET name=COALESCE($2,name), avatar=COALESCE($3,avatar) WHERE id=$1 RETURNING '+fields,[id,name?.trim(),avatar])).rows[0];
 exports.changePassword = async (id,password) => query('UPDATE users SET password=$2 WHERE id=$1',[id,await bcrypt.hash(password,12)]);
+
+exports.findFirstAdmin = async () => (await query('SELECT '+fields+" FROM users WHERE role='admin' ORDER BY created_at,id LIMIT 1")).rows[0];

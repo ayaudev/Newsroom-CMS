@@ -33,14 +33,16 @@ const Login = () => {
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <h1 className="text-3xl font-bold text-center mb-8">Войти</h1>
+        <div className="text-center mb-8"><img src="/favicon.svg" alt="" width="48" height="48" className="mx-auto mb-4"/><p className="text-sm font-semibold text-primary-700 mb-2">Newsroom CMS</p><h1 className="text-3xl font-bold">Вход в аккаунт</h1><p className="text-gray-500 mt-2 text-sm">Университетская редакция</p></div>
         
         <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-md">
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2">
+            <label htmlFor="login-email" className="block text-gray-700 text-sm font-medium mb-2">
               Электронная почта
             </label>
             <input
+              id="login-email"
+              autoComplete="username"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -54,6 +56,8 @@ const Login = () => {
               Пароль
             </label>
             <input
+              id="login-password"
+              autoComplete="current-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

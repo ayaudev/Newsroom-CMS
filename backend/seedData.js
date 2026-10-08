@@ -12,7 +12,7 @@ const samples=[
  {title:'План следующего выпуска университетской редакции',category:'local',summary:'Рабочий материал для редакторов.',content:'<p>Подготовить интервью с исследователями, репортаж о кампусе и обзор студенческих проектов.</p>',status:'draft'}
 ];
 async function seed(){
- const admin=await User.findByEmail(process.env.ADMIN_EMAIL||'');if(!admin||admin.role!=='admin')throw new Error('Сначала создайте администратора: npm run seed');
+ const admin=process.env.ADMIN_EMAIL?await User.findByEmail(process.env.ADMIN_EMAIL):await User.findFirstAdmin();if(!admin||admin.role!=='admin')throw new Error('Сначала создайте администратора: npm run setup:admin');
  for(const item of samples){const existing=await Post.list({search:item.title,admin:true});if(existing.data.some(p=>p.title===item.title))continue;await Post.create({...item,content:clean(item.content),status:item.status||'published'},admin.id);}
  console.log('Демонстрационные публикации добавлены; существующие записи сохранены');
 }

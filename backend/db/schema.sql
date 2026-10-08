@@ -34,3 +34,10 @@ CREATE INDEX IF NOT EXISTS posts_published_idx ON posts(published_at DESC, id) W
 CREATE INDEX IF NOT EXISTS posts_category_idx ON posts(category_id,status);
 CREATE INDEX IF NOT EXISTS comments_moderation_idx ON comments(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS comments_post_idx ON comments(post_id,parent_id,status);
+
+-- Additive migration: existing users and content are preserved.
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+ token_hash char(64) PRIMARY KEY,
+ expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS revoked_tokens_expiry_idx ON revoked_tokens(expires_at);

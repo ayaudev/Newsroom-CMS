@@ -1,5 +1,5 @@
 import { categoryLabel, statusLabel } from '../utils/labels';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { FiUser, FiMail, FiLock, FiSave } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +7,7 @@ import { authAPI } from '../services/api';
 import { Navigate } from 'react-router-dom';
 
 const Profile = () => {
-  const { user, isAuthenticated, updateUser } = useAuth();
+  const { user, isAuthenticated, updateUser, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(false);
   
@@ -22,6 +22,11 @@ const Profile = () => {
     confirmPassword: ''
   });
 
+  useEffect(() => {
+    if (user) setProfileData({ name: user.name || '', avatar: user.avatar || '' });
+  }, [user]);
+
+  if (authLoading) return <div className="p-8 text-center">Загрузка...</div>;
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -49,8 +54,9 @@ const Profile = () => {
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      toast.error("Пароль должен содержать минимум 6 символов");
+    const minimum = user.role === 'admin' ? 12 : 6;
+    if (Array.from(passwordData.newPassword).length < minimum || (user.role === 'admin' && new TextEncoder().encode(passwordData.newPassword).length > 72)) {
+      toast.error(user.role === 'admin' ? 'Пароль администратора: минимум 12 символов, максимум 72 байта UTF-8' : 'Пароль должен содержать минимум 6 символов');
       return;
     }
 
@@ -209,7 +215,7 @@ const Profile = () => {
                 onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
                 required
-                minLength={6}
+                minLength={user.role === 'admin' ? 12 : 6}
               />
             </div>
 
@@ -223,7 +229,7 @@ const Profile = () => {
                 onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
                 required
-                minLength={6}
+                minLength={user.role === 'admin' ? 12 : 6}
               />
             </div>
           </div>

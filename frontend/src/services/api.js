@@ -24,7 +24,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(response => response, error => {
  if(error.response?.status === 401 && !/\/auth\/(login|register)$/.test(error.config?.url || '')) {
   localStorage.removeItem('token');localStorage.removeItem('user');
-  if(window.location.pathname !== '/login') window.location.href='/login';
+  if(window.location.pathname !== '/login' && error.config?.url !== '/auth/logout') window.location.href='/login';
  }
  return Promise.reject(error);
 });
@@ -33,6 +33,7 @@ api.interceptors.response.use(response => response, error => {
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   getMe: () => api.get('/auth/me'),
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.put('/auth/password', data)

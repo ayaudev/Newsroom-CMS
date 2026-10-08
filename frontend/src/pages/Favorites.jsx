@@ -6,12 +6,13 @@ import Loading from '../components/Loading';
 import { Link } from 'react-router-dom';
 
 const Favorites = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFavorites = async () => {
+      setLoading(true);
       try {
         const res = await newsAPI.getFavorites();
         setFavorites(res.data.data);
@@ -28,6 +29,8 @@ const Favorites = () => {
       setLoading(false);
     }
   }, [isAuthenticated]);
+
+  if (authLoading) return <Loading />;
 
   if (!isAuthenticated) {
     return (
