@@ -92,6 +92,7 @@ const NewsCard = ({ news, variant = 'default' }) => {
           <p className="text-gray-600 text-sm mt-2 line-clamp-2">
             {news.summary}
           </p>
+          {news.author?.name && <p className="text-xs text-gray-500 mt-3">Автор: {news.author.name}</p>}
           <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
             <span className="flex items-center">
               <FiClock className="mr-1" />

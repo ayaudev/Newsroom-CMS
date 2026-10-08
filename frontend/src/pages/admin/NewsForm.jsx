@@ -31,6 +31,7 @@ const NewsForm = () => {
         try {
           const res = await adminAPI.getNewsById(id);
           const news = res.data.data;
+          if(news.status === 'PENDING_REVIEW' && news.revisionId){navigate('/admin/submissions/'+news.revisionId);return;}
           setFormData({
             title: news.title,
             content: news.content,

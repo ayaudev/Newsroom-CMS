@@ -135,3 +135,94 @@ test('first-time setup rejects occupied email and concurrent commands produce on
   assert.equal((await setupPool.query("SELECT count(*)::int AS count FROM users WHERE role='user'")).rows[0].count,1);
  }finally{adminPool.connect=originalConnect;await setupPool.end();await isolated.end();}
 });
+
+test('user submissions: immutable authorship, review, rejection/resubmission and safe published revisions', {skip:!enabled}, async()=>{
+ const authorRegistration=await request('/api/auth/register','POST',{name:'Алия',email:'aliya@workflow.test',password:'author-test-passphrase',role:'admin'});
+ assert.equal(authorRegistration.status,201);assert.equal(authorRegistration.data.role,'user');const authorId=authorRegistration.data.id;
+ const userLogin=await request('/api/auth/login','POST',{email:'aliya@workflow.test',password:'author-test-passphrase'});assert.equal(userLogin.status,200);const user=userLogin.data.token;
+ const other=(await request('/api/auth/register','POST',{name:'Другой автор',email:'other@workflow.test',password:'other-test-passphrase'})).data.token;
+ const admin=(await request('/api/auth/login','POST',{email:'editor@test.local',password:'editor-test-passphrase'})).data.token;
+ const adminId=(await request('/api/auth/me','GET',undefined,admin)).data.id;
+ const material={title:'Новые технологии в Казахстане',summary:'Новость от Алии',content:'<p>Исходный текст автора</p><script>alert(1)</script>',category:'technology',image:''};
+ assert.equal((await request('/api/my/posts','POST',material)).status,401);
+ for(const field of [{status:'published'},{author_user_id:adminId},{author:adminId},{reviewed_by_admin_id:adminId},{isFeatured:true}])assert.equal((await request('/api/my/posts','POST',{...material,...field},user)).status,400);
+ assert.equal((await request('/api/my/posts','POST',{...material,category:'missing'},user)).status,400);
+ assert.equal((await request('/api/my/posts','POST',{...material,title:'x'.repeat(201)},user)).status,400);
+ const submitted=await request('/api/my/posts','POST',material,user);assert.equal(submitted.status,201);const article=submitted.data;
+ assert.equal(article.status,'PENDING_REVIEW');assert.equal(article.author.name,'Алия');assert.equal(article.authorUserId,authorId);assert.equal(article.originalSubmission.authorUserId,authorId);assert.doesNotMatch(article.content,/<script>/);
+ const firstRevision=article.revisionId;
+ assert.equal((await request('/api/news/'+article.slug)).status,404);
+ assert.ok(!(await request('/api/posts/latest')).data.some(p=>p.id===article.id));
+ assert.equal((await request('/api/my/posts/'+article.id,'GET',undefined,other)).status,404);
+ assert.equal((await request('/api/my/posts/'+article.id,'PUT',{title:'Чужая правка'},other)).status,404);
+ assert.equal((await request('/api/my/posts/'+article.id+'/submit','POST',{},other)).status,404);
+ assert.equal((await request('/api/my/posts/'+article.id,'PUT',{title:'Правка во время проверки'},user)).status,409);
+ assert.equal((await request('/api/my/posts/'+article.id+'/submit','POST',{status:'published'},user)).status,400);
+ assert.equal((await request('/api/admin/submissions','GET')).status,401);
+ assert.equal((await request('/api/admin/submissions','GET',undefined,user)).status,403);
+ assert.equal((await request('/api/admin/submissions/'+firstRevision,'PUT',{title:'Обход'},user)).status,403);
+ assert.equal((await request('/api/admin/submissions/'+firstRevision+'/decision','PATCH',{decision:'approve'},user)).status,403);
+ assert.equal((await request('/api/admin/news/'+article.id,'PUT',{status:'published'},user)).status,403);
+ const queue=await request('/api/admin/submissions','GET',undefined,admin);assert.ok(queue.data.some(r=>r.id===firstRevision));
+ const original=(await request('/api/admin/submissions/'+firstRevision,'GET',undefined,admin)).data.originalSubmission;
+ assert.equal(original.title,material.title);assert.equal(original.content,'<p>Исходный текст автора</p>');
+ assert.equal((await request('/api/admin/submissions/'+firstRevision,'PUT',{author_user_id:adminId},admin)).status,400);
+ const edits={title:'Новые технологии: редакционная версия',summary:'Описание после проверки',content:'<p>Проверенный текст</p>',category:'science',image:'/uploads/test-cover.png'};
+ const edited=await request('/api/admin/submissions/'+firstRevision,'PUT',edits,admin);assert.equal(edited.status,200);assert.deepEqual(edited.data.originalSubmission,original);
+ assert.equal((await request('/api/news/'+article.slug)).status,404);
+ assert.equal((await request('/api/admin/submissions/'+firstRevision+'/decision','PATCH',{decision:'approve',changes:{author_user_id:adminId}},admin)).status,400);
+ const approved=await request('/api/admin/submissions/'+firstRevision+'/decision','PATCH',{decision:'approve',changes:edits},admin);assert.equal(approved.status,200);assert.equal(approved.data.reviewedByAdminId,adminId);
+ const publicArticle=(await request('/api/news/'+article.slug)).data;assert.equal(publicArticle.title,edits.title);assert.equal(publicArticle.content,edits.content);assert.equal(publicArticle.author.name,'Алия');assert.equal(publicArticle.author._id,authorId);assert.equal(publicArticle.authorUserId,authorId);assert.equal(publicArticle.reviewedByAdminId,adminId);
+ assert.ok((await request('/api/posts/latest')).data.some(p=>p.id===article.id));
+ assert.equal((await request('/api/admin/submissions/'+firstRevision+'/decision','PATCH',{decision:'reject'},admin)).status,409);
+ // Database guard protects authorship independently of controller whitelists.
+ await assert.rejects(pool.query('UPDATE posts SET author_id=$2 WHERE id=$1',[article.id,adminId]),error=>error.code==='23514');
+ await assert.rejects(pool.query('UPDATE post_revisions SET original_submission=$2 WHERE id=$1',[firstRevision,{}]),error=>error.code==='23514');
+ // Editing a published article creates a private draft; the live version stays unchanged.
+ const changed=await request('/api/my/posts/'+article.id,'PUT',{title:'Новая версия автора',content:'<p>Новые сведения</p>'},user);assert.equal(changed.status,200);assert.equal(changed.data.status,'draft');assert.equal(changed.data.hasPublishedVersion,true);assert.notEqual(changed.data.revisionId,firstRevision);
+ assert.equal((await request('/api/news/'+article.slug)).data.content,edits.content);
+ assert.equal((await request('/api/my/posts/'+article.id,'PUT',{status:'published'},user)).status,400);
+ const reviewedAgain=await request('/api/my/posts/'+article.id+'/submit','POST',{},user);assert.equal(reviewedAgain.data.status,'PENDING_REVIEW');const secondRevision=reviewedAgain.data.revisionId;
+ assert.equal((await request('/api/admin/submissions/'+secondRevision+'/decision','PATCH',{decision:'reject',reason:'Пожалуйста, добавьте проверяемый источник'},admin)).status,200);
+ assert.equal((await request('/api/my/posts/'+article.id,'GET',undefined,user)).data.status,'rejected');assert.equal((await request('/api/news/'+article.slug)).data.content,edits.content);
+ assert.equal((await request('/api/my/posts/'+article.id,'PUT',{content:'<p>Новые сведения со ссылкой на источник</p>'},user)).data.status,'draft');
+ const resubmitted=(await request('/api/my/posts/'+article.id+'/submit','POST',{},user)).data;assert.equal(resubmitted.status,'PENDING_REVIEW');assert.notEqual(resubmitted.revisionId,secondRevision);
+ assert.equal((await request('/api/admin/submissions/'+secondRevision,'GET',undefined,admin)).data.rejectionReason,'Пожалуйста, добавьте проверяемый источник');
+ // Compatibility publishing route also reviews the active version and never changes the author.
+ const legacyPublish=await request('/api/admin/news/'+article.id,'PUT',{status:'published',title:'Финальное название'},admin);assert.equal(legacyPublish.status,200);
+ const final=(await request('/api/news/'+article.slug)).data;assert.equal(final.title,'Финальное название');assert.match(final.content,/со ссылкой/);assert.equal(final.author.name,'Алия');
+ assert.equal((await request('/api/admin/submissions/'+resubmitted.revisionId,'GET',undefined,admin)).data.reviewedByAdminId,adminId);
+ // Rejected first submissions remain private, can be resubmitted unchanged, and accept no arbitrary status.
+ const rejected=(await request('/api/my/posts','POST',{...material,title:'Ещё одна новость'},user)).data;
+ await request('/api/admin/submissions/'+rejected.revisionId+'/decision','PATCH',{decision:'reject'},admin);
+ assert.equal((await request('/api/news/'+rejected.slug)).status,404);
+ const retry=(await request('/api/my/posts/'+rejected.id+'/submit','POST',{},user)).data;assert.equal(retry.status,'PENDING_REVIEW');assert.notEqual(retry.revisionId,rejected.revisionId);
+ const draft=(await request('/api/my/posts','POST',{...material,title:'Мой черновик',intent:'draft'},user)).data;assert.equal(draft.status,'draft');
+ assert.equal((await request('/api/admin/news/'+draft.id,'PUT',{status:'published'},admin)).status,409);
+ assert.equal((await request('/api/my/posts/'+draft.id,'PUT',{title:'Обновлённый черновик'},user)).status,200);
+ assert.equal((await request('/api/my/posts/'+draft.id+'/submit','POST',{},user)).data.status,'PENDING_REVIEW');
+ assert.equal((await request('/api/my/posts?status=PENDING_REVIEW','GET',undefined,user)).total,2);
+ assert.equal((await request('/api/my/posts','GET',undefined,other)).total,0);
+ // Concurrent moderation can have only one final decision.
+ const decisions=await Promise.all([request('/api/admin/submissions/'+retry.revisionId+'/decision','PATCH',{decision:'approve'},admin),request('/api/admin/submissions/'+retry.revisionId+'/decision','PATCH',{decision:'reject'},admin)]);
+ assert.deepEqual(decisions.map(r=>r.status).sort(),[200,409]);
+ const counts=(await pool.query('SELECT author_user_id,author_id FROM posts WHERE id=$1',[article.id])).rows[0];assert.equal(counts.author_user_id,authorId);assert.equal(counts.author_id,authorId);
+ await require('../db/migrate')();assert.equal((await request('/api/news/'+article.slug)).data.author.name,'Алия');
+});
+
+test('additive submission migration preserves pre-existing PostgreSQL posts, authors and comments', {skip:!enabled}, async()=>{
+ const {Pool}=require('pg'),{randomUUID}=require('crypto');const database='submission_upgrade_'+randomUUID().replaceAll('-','');await pool.query('CREATE DATABASE '+database);
+ const db=new Pool({connectionString:process.env.DATABASE_URL.replace(/\/newsroom_test$/,'/'+database)});
+ try {
+  const fs=require('fs/promises'),path=require('path');await db.query(await fs.readFile(path.join(__dirname,'../db/schema.sql'),'utf8'));
+  const user=randomUUID(),category=randomUUID(),post=randomUUID(),comment=randomUUID();
+  await db.query('INSERT INTO users(id,name,email,password) VALUES($1,$2,$3,$4)',[user,'Старый автор','old@upgrade.test','existing-hash']);
+  await db.query('INSERT INTO categories(id,slug,name) VALUES($1,$2,$3)',[category,'existing','Существующая категория']);
+  await db.query("INSERT INTO posts(id,title,slug,content,category_id,author_id,status,published_at,views) VALUES($1,'Существующая новость','existing-slug','Исходный текст',$2,$3,'published',now(),17)",[post,category,user]);
+  await db.query("INSERT INTO comments(id,content,post_id,user_id,status) VALUES($1,'Старый комментарий',$2,$3,'approved')",[comment,post,user]);
+  const before=(await db.query('SELECT * FROM posts WHERE id=$1',[post])).rows[0];
+  await db.query(await fs.readFile(path.join(__dirname,'../db/migrations/002_article_submissions.sql'),'utf8'));
+  const after=(await db.query('SELECT * FROM posts WHERE id=$1',[post])).rows[0];for(const key of Object.keys(before))assert.deepEqual(after[key],before[key]);assert.equal(after.author_user_id,user);assert.equal(after.reviewed_by_admin_id,null);
+  assert.equal((await db.query('SELECT content FROM comments WHERE id=$1',[comment])).rows[0].content,'Старый комментарий');assert.equal((await db.query('SELECT password FROM users WHERE id=$1',[user])).rows[0].password,'existing-hash');
+ }finally{await db.end();}
+});

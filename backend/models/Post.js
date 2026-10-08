@@ -1,13 +1,13 @@
 const { query, transaction } = require('../config/db');
 const { randomUUID } = require('crypto');
 const select = `SELECT p.id AS "_id", p.id, p.title, p.slug, p.content, p.summary, c.slug AS category,
- c.id AS "categoryId", c.name AS "categoryName", p.tags, p.image, p.status, p.views,
+ c.id AS "categoryId", c.name AS "categoryName", p.tags, p.image, p.status, p.views, p.author_user_id AS "authorUserId", p.active_revision_id AS "activeRevisionId", p.reviewed_by_admin_id AS "reviewedByAdminId",
  p.is_featured AS "isFeatured", p.published_at AS "publishedAt", p.created_at AS "createdAt", p.updated_at AS "updatedAt",
  json_build_object('_id',u.id,'name',u.name,'avatar',u.avatar) AS author,
  (SELECT count(*)::int FROM post_likes l WHERE l.post_id=p.id) AS "likesCount",
  EXISTS(SELECT 1 FROM post_likes l WHERE l.post_id=p.id AND l.user_id=$1::uuid) AS "isLiked",
  EXISTS(SELECT 1 FROM favorites f WHERE f.post_id=p.id AND f.user_id=$1::uuid) AS "isFavorited"
- FROM posts p JOIN categories c ON c.id=p.category_id JOIN users u ON u.id=p.author_id`;
+ FROM posts p JOIN categories c ON c.id=p.category_id JOIN users u ON u.id=p.author_user_id`;
 exports.list = async (filters={}, userId=null) => {
  const values=[userId], conditions=[];
  const add=(sql,value)=>{values.push(value);conditions.push(sql.replace('?', '$'+values.length));};
@@ -32,9 +32,10 @@ exports.create = async (data,author) => {
  VALUES($1,$2,$3,$4,$5,(SELECT id FROM categories WHERE slug=$6),$7,$8,$9,$10,$11,CASE WHEN $10='published' THEN now() END)`,[id,data.title,slug,data.content,data.summary||'',data.category,author,data.tags||[],data.image||'',data.status||'draft',data.isFeatured||false]);
  return exports.get(id);
 };
-exports.update = async (id,data) => {
+exports.update = async (id,data,adminId) => {
  const columns={title:'title',content:'content',summary:'summary',tags:'tags',image:'image',status:'status',isFeatured:'is_featured'};
  const values=[id],sets=['updated_at=now()'];
+ if(adminId){values.push(adminId);sets.push('reviewed_by_admin_id=$'+values.length,'reviewed_at=now()');}
  for(const [key,column] of Object.entries(columns)) if(data[key]!==undefined){values.push(data[key]);sets.push(column+'=$'+values.length);}
  if(data.category!==undefined){values.push(data.category);sets.push('category_id=(SELECT id FROM categories WHERE slug=$'+values.length+')');}
  if(data.status==='published')sets.push("published_at=CASE WHEN status <> 'published' THEN now() ELSE COALESCE(published_at,now()) END");
@@ -55,8 +56,9 @@ exports.toggle = async (id,userId,favorite=false) => transaction(async client=>{
 exports.stats = async()=> {
  const row=(await query(`SELECT count(*)::int AS "totalNews", count(*) FILTER(WHERE status='published')::int AS "publishedNews", count(*) FILTER(WHERE status='draft')::int AS "draftNews", count(*) FILTER(WHERE is_featured)::int AS "featuredNews", COALESCE(sum(views),0)::int AS "totalViews" FROM posts`)).rows[0];
  const totalLikes=Number((await query('SELECT count(*) FROM post_likes')).rows[0].count);
+ const pendingSubmissions=Number((await query("SELECT count(*) FROM post_revisions r JOIN posts p ON p.active_revision_id=r.id WHERE r.status='PENDING_REVIEW'")).rows[0].count);
  const pendingComments=Number((await query("SELECT count(*) FROM comments WHERE status='pending'")).rows[0].count);
  const newsByCategory=(await query('SELECT c.slug AS "_id",c.name,count(p.id)::int AS count FROM categories c LEFT JOIN posts p ON p.category_id=c.id GROUP BY c.id ORDER BY count DESC')).rows;
  const recentNews=(await exports.list({admin:true,limit:5})).data;
- return {...row,engagement:{totalViews:row.totalViews,totalLikes},newsByCategory,recentNews,pendingComments};
+ return {...row,engagement:{totalViews:row.totalViews,totalLikes},newsByCategory,recentNews,pendingComments,pendingSubmissions};
 };

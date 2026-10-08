@@ -25,6 +25,13 @@ const newsValidation = [
 // All routes require authentication and admin role
 router.use(protect, admin);
 
+const submissions = require('../controllers/submissionController');
+router.param('id',(req,res,next,id)=>{req.params.id=id.toLowerCase();next();});
+router.get('/submissions',submissions.listReviews);
+router.get('/submissions/:id',submissions.getReview);
+router.put('/submissions/:id',submissions.editReview);
+router.patch('/submissions/:id/decision',submissions.decide);
+
 // Dashboard stats
 router.get('/stats', getDashboardStats);
 const comments = require('../controllers/commentController');

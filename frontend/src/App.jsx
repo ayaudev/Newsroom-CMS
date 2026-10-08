@@ -25,6 +25,11 @@ import NewsForm from './pages/admin/NewsForm';
 import Moderation from './pages/admin/Moderation';
 import Categories from './pages/admin/Categories';
 
+import MyPublications from './pages/MyPublications';
+import SubmitArticle from './pages/SubmitArticle';
+import SubmissionList from './pages/admin/SubmissionList';
+import SubmissionReview from './pages/admin/SubmissionReview';
+
 function App() {
   return (
     <AuthProvider>
@@ -33,6 +38,8 @@ function App() {
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
+            <Route path="submissions" element={<SubmissionList />} />
+            <Route path="submissions/:id" element={<SubmissionReview />} />
             <Route path="comments" element={<Moderation />} />
             <Route path="categories" element={<Categories />} />
             <Route path="news" element={<NewsList />} />
@@ -52,6 +59,9 @@ function App() {
                     <Route path="/news/:slug" element={<NewsDetail />} />
                     <Route path="/category/:category" element={<Category />} />
                     <Route path="/favorites" element={<Favorites />} />
+                    <Route path="/my/posts" element={<MyPublications />} />
+                    <Route path="/my/posts/create" element={<SubmitArticle />} />
+                    <Route path="/my/posts/:id" element={<SubmitArticle />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />

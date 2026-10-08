@@ -10,7 +10,7 @@ app.use(express.urlencoded({extended:true}));
 app.use('/uploads',express.static(path.join(__dirname,'uploads')));
 // Validate UUID route parameters before PostgreSQL casting.
 app.use((req,res,next)=>{
- const match=req.path.match(/\/(?:admin\/news|admin\/comments|admin\/categories|comments)\/([^/]+)/);
+ const match=req.path.match(/\/(?:admin\/news|admin\/comments|admin\/categories|admin\/submissions|comments)\/([^/]+)/);
  if(match && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(match[1]))return res.status(400).json({success:false,message:'Некорректный идентификатор'});
  next();
 });
@@ -18,6 +18,7 @@ app.use('/api/auth',require('./routes/authRoutes'));
 app.use('/api/admin',require('./routes/adminRoutes'));
 app.use('/api/news',require('./routes/newsRoutes'));
 app.use('/api/posts',require('./routes/newsRoutes'));
+app.use('/api/my',require('./routes/myRoutes'));
 app.use('/api/comments',require('./routes/commentRoutes'));
 app.get('/api/categories',require('./controllers/userNewsController').getCategories);
 app.get('/api/health',require('./middleware/async')(async(req,res)=>{await pool.query('SELECT 1');res.json({success:true,message:'Newsroom CMS работает'});}));

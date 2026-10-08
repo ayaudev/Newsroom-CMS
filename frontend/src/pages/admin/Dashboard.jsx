@@ -42,6 +42,7 @@ const AdminDashboard = () => {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 mb-8"><Link to="/admin/news?status=draft" className="bg-white border border-gray-200 rounded-xl p-6"><span className="text-sm text-gray-500">Черновики</span><strong className="text-3xl block mt-2">{stats?.draftNews || 0}</strong><span className="text-sm text-primary-600">Продолжить работу →</span></Link><Link to="/admin/comments" className="bg-white border border-gray-200 rounded-xl p-6"><span className="text-sm text-gray-500">Комментарии на проверке</span><strong className="text-3xl block mt-2">{stats?.pendingComments || 0}</strong><span className="text-sm text-primary-600">Открыть модерацию →</span></Link></div>
+      <Link to="/admin/submissions" className="block bg-primary-50 border border-primary-100 rounded-xl p-6 mb-8"><span className="text-sm text-primary-700">Новости на проверке</span><strong className="text-3xl block my-2">{stats?.pendingSubmissions || 0}</strong><span className="text-sm text-primary-700">Рассмотреть материалы авторов →</span></Link>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-md">

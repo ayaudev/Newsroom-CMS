@@ -83,3 +83,19 @@ export const adminAPI = {
 };
 
 export default api;
+
+// Owner routes always derive authorship from the authenticated account.
+export const myPostsAPI = {
+ list: params => api.get('/my/posts',{params}),
+ get: id => api.get('/my/posts/'+id),
+ create: data => api.post('/my/posts',data),
+ update: (id,data) => api.put('/my/posts/'+id,data),
+ submit: id => api.post('/my/posts/'+id+'/submit',{}),
+ uploadImage: data => api.post('/my/upload',data,{headers:{'Content-Type':'multipart/form-data'}})
+};
+export const submissionsAPI = {
+ list: params => api.get('/admin/submissions',{params}),
+ get: id => api.get('/admin/submissions/'+id),
+ update: (id,data) => api.put('/admin/submissions/'+id,data),
+ decide: (id,decision,reason,changes) => api.patch('/admin/submissions/'+id+'/decision',{decision,reason,changes})
+};

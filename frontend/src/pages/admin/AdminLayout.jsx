@@ -24,6 +24,7 @@ const AdminLayout = () => {
     { to: '/admin', icon: FiHome, label: "Обзор редакции", end: true },
     { to: '/admin/news', icon: FiFileText, label: "Публикации" },
     { to: '/admin/news/create', icon: FiPlusCircle, label: "Новая публикация" },
+    { to: '/admin/submissions', icon: FiFileText, label: 'Новости на проверке' },
     { to: '/admin/comments', icon: FiFileText, label: 'Модерация' },
     { to: '/admin/categories', icon: FiSettings, label: 'Категории' }
   ];
