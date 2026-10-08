@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+:root { color-scheme: light; color: #172438; background: #f5f7fa; }
+body { margin:0; line-height:1.6; -webkit-font-smoothing:antialiased; }
+h1,h2,h3 { line-height:1.25; letter-spacing:-.025em; }
+button,a,input,textarea,select { -webkit-tap-highlight-color:transparent; }
+button { transition:background-color .15s, opacity .15s; }
+button:disabled { opacity:.45; cursor:not-allowed; }
+:focus-visible { outline:3px solid #38bdf8; outline-offset:3px; }
+input,textarea,select { accent-color:#0f766e; }
+.shadow-md { box-shadow:0 3px 16px rgba(15,23,42,.045); border:1px solid #e8edf2; }
+.brand-mark { width:42px;height:42px;display:grid;place-content:center;background:#13283e;border-radius:12px;color:white;font-size:25px;font-weight:800;position:relative; }
+.brand-mark span {color:#5eead4;position:absolute;right:6px;bottom:4px;}
+.editorial-hero {background:linear-gradient(120deg,#12283f,#184855);border-radius:22px;padding:48px;position:relative;overflow:hidden;color:white;}
+.hero-orbit {width:360px;height:360px;border:1px solid #ffffff24;border-radius:50%;position:absolute;right:-60px;top:-80px;box-shadow:0 0 0 50px #ffffff05,0 0 0 100px #ffffff04,0 0 0 150px #ffffff03;}
+.prose {color:#334155;line-height:1.85;overflow-wrap:anywhere;}
+.prose p,.prose ul,.prose ol,.prose blockquote {margin:1em 0;}
+.prose h2,.prose h3 {margin:1.5em 0 .6em;font-weight:700;}
+.prose h2 {font-size:1.6em;}.prose h3 {font-size:1.3em;}
+.prose a {color:#0f766e;text-decoration:underline;}.prose ul {list-style:disc;padding-left:1.5em;}.prose ol {list-style:decimal;padding-left:1.5em;}
+.prose img {max-width:100%;height:auto;border-radius:12px;}.prose blockquote {border-left:3px solid #0f766e;padding-left:1em;font-style:italic;}
+@media(max-width:640px){.editorial-hero{padding:28px 24px}.hero-orbit{opacity:.4}.site-header strong{font-size:17px}.prose{font-size:16px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important;}}

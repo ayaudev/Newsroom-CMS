@@ -1,0 +1,15 @@
+import { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
+import { adminAPI } from '../../services/api';
+import Loading from '../../components/Loading';
+const labels={pending:'На проверке',approved:'Одобрены',rejected:'Отклонены'};
+export default function Moderation(){
+ const [status,setStatus]=useState('pending'),[items,setItems]=useState([]),[page,setPage]=useState(1),[pages,setPages]=useState(0),[loading,setLoading]=useState(true),[busy,setBusy]=useState(null),[error,setError]=useState('');
+ async function load(){setLoading(true);setError('');try{const {data}=await adminAPI.getComments({status,page,limit:20});setItems(data.data);setPages(data.totalPages);}catch(e){setError(e.response?.data?.message||'Не удалось загрузить комментарии');}finally{setLoading(false);}}
+ useEffect(()=>{load();},[status,page]);
+ async function moderate(id,next){setBusy(id);try{await adminAPI.moderateComment(id,next);toast.success('Статус изменён');await load();}catch(e){toast.error(e.response?.data?.message||'Не удалось изменить статус');}finally{setBusy(null);}}
+ return <div><p className="text-sm text-gray-500 mb-2">Редакционный контроль</p><h1 className="text-3xl font-bold mb-6">Модерация комментариев</h1>
+ <div className="flex gap-2 mb-6 flex-wrap">{Object.entries(labels).map(([key,label])=><button key={key} onClick={()=>{setStatus(key);setPage(1);}} className={'px-4 py-2 rounded-lg '+(key===status?'bg-primary-600 text-white':'bg-white text-gray-700')}>{label}</button>)}</div>
+ {error?<div role="alert" className="bg-red-50 p-4 rounded-lg">{error} <button onClick={load}>Повторить</button></div>:loading?<Loading/>:items.length===0?<div className="bg-white p-12 text-center rounded-xl text-gray-500">В этой очереди пока нет комментариев.</div>:<div className="space-y-4">{items.map(item=><article key={item._id} className="bg-white rounded-xl p-6 border border-gray-100"><div className="flex justify-between gap-4"><strong>{item.user.name}</strong><time className="text-sm text-gray-500">{new Date(item.createdAt).toLocaleString('ru-RU')}</time></div><p className="text-sm text-primary-600 mt-1">{item.postTitle}{item.parentComment?' · Ответ на комментарий':''}</p><p className="my-4 whitespace-pre-wrap break-words">{item.content}</p><div className="flex gap-2 flex-wrap">{status!=='approved'&&<button disabled={busy===item._id} onClick={()=>moderate(item._id,'approved')} className="bg-green-50 text-green-700 px-4 py-2 rounded-lg">Одобрить</button>}{status!=='rejected'&&<button disabled={busy===item._id} onClick={()=>moderate(item._id,'rejected')} className="bg-red-50 text-red-700 px-4 py-2 rounded-lg">Отклонить</button>}{status!=='pending'&&<button disabled={busy===item._id} onClick={()=>moderate(item._id,'pending')} className="bg-gray-100 px-4 py-2 rounded-lg">На проверку</button>}</div></article>)}</div>}
+ <div className="flex items-center gap-4 mt-6"><button disabled={page<=1||loading} onClick={()=>setPage(p=>p-1)}>Назад</button><span>Страница {page} из {Math.max(1,pages)}</span><button disabled={page>=pages||loading} onClick={()=>setPage(p=>p+1)}>Далее</button></div></div>;
+}

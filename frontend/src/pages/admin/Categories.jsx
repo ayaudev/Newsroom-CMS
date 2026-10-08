@@ -1,0 +1,11 @@
+import {useEffect,useState} from 'react';
+import {toast} from 'react-toastify';
+import {adminAPI} from '../../services/api';
+export default function Categories(){
+ const [items,setItems]=useState([]),[name,setName]=useState(''),[slug,setSlug]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function load(){try{setError('');setItems((await adminAPI.getCategories()).data.data);}catch(e){setError('Не удалось загрузить категории');}}
+ useEffect(()=>{load();},[]);
+ async function create(e){e.preventDefault();setBusy(true);try{await adminAPI.createCategory({name,slug});setName('');setSlug('');await load();toast.success('Категория создана');}catch(e){toast.error(e.response?.data?.message||'Не удалось создать категорию');}finally{setBusy(false);}}
+ async function remove(item){if(!window.confirm('Удалить категорию «'+item.name+'»?'))return;setBusy(true);try{await adminAPI.deleteCategory(item.id);await load();toast.success('Категория удалена');}catch(e){toast.error(e.response?.data?.message||'Не удалось удалить категорию');}finally{setBusy(false);}}
+ return <div><h1 className="text-3xl font-bold mb-6">Категории</h1><form onSubmit={create} className="bg-white p-6 rounded-xl grid md:grid-cols-3 gap-4 mb-6"><label>Название<input className="block border rounded-lg p-3 w-full mt-2" value={name} onChange={e=>setName(e.target.value)} required maxLength={80}/></label><label>Адрес категории<input className="block border rounded-lg p-3 w-full mt-2" value={slug} onChange={e=>setSlug(e.target.value)} placeholder="student-life" pattern="[a-z0-9]+(-[a-z0-9]+)*" required maxLength={80}/></label><button disabled={busy} className="bg-primary-600 text-white rounded-lg p-3 self-end">Добавить категорию</button></form>{error&&<p role="alert">{error} <button onClick={load}>Повторить</button></p>}<div className="bg-white rounded-xl divide-y">{items.map(item=><div key={item.id} className="p-4 flex justify-between items-center gap-4"><div><strong>{item.name}</strong><p className="text-gray-500 text-sm">/{item.slug} · Опубликовано: {item.count}</p></div><button disabled={busy} className="text-red-600" onClick={()=>remove(item)}>Удалить</button></div>)}</div><p className="text-sm text-gray-500 mt-4">Категорию с публикациями удалить нельзя. Сначала перенесите публикации в другую категорию.</p></div>;
+}
