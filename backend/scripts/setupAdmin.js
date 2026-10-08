@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { pool } = require('../config/db');
+const { pool, hasDatabaseConfiguration } = require('../config/db');
 const { assertInitialSetupAvailable, createInitialAdmin } = require('../services/adminSetup');
 const { normalizeName, normalizeEmail, validatePassword } = require('../utils/adminCredentials');
 const { createTerminalPrompt } = require('../utils/terminalPrompt');
@@ -25,7 +25,7 @@ async function collectCredentials(prompt, output) {
 }
 
 async function runSetup({ input = process.stdin, output = process.stdout } = {}) {
-  if (!process.env.DATABASE_URL) throw Object.assign(new Error('Укажите DATABASE_URL в backend/.env и выполните npm run migrate.'), { code: 'CONFIG_REQUIRED' });
+  if (!hasDatabaseConfiguration()) throw Object.assign(new Error('Укажите DATABASE_URL в backend/.env и выполните npm run migrate.'), { code: 'CONFIG_REQUIRED' });
   await assertInitialSetupAvailable();
   const prompt = createTerminalPrompt(input, output);
   try {

@@ -12,7 +12,8 @@
     "test": "node --test tests/*.test.js",
     "import:mongo": "node db/importMongo.js",
     "test:integration": "node scripts/testPostgres.js",
-    "setup:admin": "node scripts/setupAdmin.js"
+    "setup:admin": "node scripts/setupAdmin.js",
+    "test:docker": "node scripts/testDocker.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

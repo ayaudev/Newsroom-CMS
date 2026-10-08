@@ -1,18 +1,101 @@
+name: ${COMPOSE_PROJECT_NAME:-newsroom-cms}
+
 services:
   postgres:
     image: postgres:18
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: newsroom
-      POSTGRES_USER: newsroom
+      POSTGRES_DB: ${POSTGRES_DB:-newsroom}
+      POSTGRES_USER: ${POSTGRES_USER:-newsroom}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in root .env}
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - newsroom_pg:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U newsroom -d newsroom"]
+      test: ["CMD-SHELL", 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
-      timeout: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-newsroom}
+      PGUSER: ${POSTGRES_USER:-newsroom}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in root .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in root .env}
+      JWT_EXPIRE: ${JWT_EXPIRE:-7d}
+      FRONTEND_URL: http://localhost:${HTTP_PORT:-8080}
+    volumes:
+      - newsroom_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "scripts/healthcheck.js"]
+      interval: 10s
+      timeout: 3s
       retries: 10
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # Isolated tests: no application volumes, no host database connection.
+  postgres-test:
+    profiles: ["test"]
+    image: postgres:18
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: newsroom_test
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in root .env}
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsroom_test -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: ./backend
+    init: true
+    command: ["node", "scripts/testDocker.js"]
+    environment:
+      NODE_ENV: test
+      PGHOST: postgres-test
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: newsroom_test
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in root .env}
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+
 volumes:
+  # Preserve the existing Compose volume key and PostgreSQL 18 mount path.
   newsroom_pg:
+  newsroom_uploads:

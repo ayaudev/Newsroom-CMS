@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { pool } = require('./config/db');
+const { pool, hasDatabaseConfiguration } = require('./config/db');
 const app = express();
 app.use(cors({origin:process.env.FRONTEND_URL || 'http://localhost:3000'}));
 app.use(express.json({limit:'2mb'}));
@@ -30,7 +30,7 @@ app.use((err,req,res,next)=>{
  res.status(status).json({success:false,message:messages[err.code]||(err.code==='LIMIT_FILE_SIZE'?'Изображение должно быть не больше 5 МБ':status<500?err.message:'Ошибка сервера. Повторите попытку позже')});
 });
 async function start(){
- if(!process.env.DATABASE_URL||!process.env.JWT_SECRET)throw new Error('Укажите DATABASE_URL и JWT_SECRET в backend/.env');
+ if(!hasDatabaseConfiguration()||!process.env.JWT_SECRET)throw new Error('Укажите параметры PostgreSQL и JWT_SECRET в окружении');
  await pool.query('SELECT 1');
  const server=app.listen(process.env.PORT||5000,()=>console.log('Newsroom CMS: порт '+(process.env.PORT||5000)));
  const stop=()=>server.close(()=>pool.end());process.on('SIGTERM',stop);process.on('SIGINT',stop);return server;

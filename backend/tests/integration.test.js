@@ -6,7 +6,7 @@ async function request(url,method='GET',body,token){
  const res=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body)});
  return {status:res.status,...await res.json()};
 }
-before(async()=>{if(!enabled)return;assert.match(process.env.DATABASE_URL,/\/newsroom_test$/);pool=require('../config/db').pool;User=require('../models/User');await require('../db/migrate')();server=require('../server').app.listen(0,'127.0.0.1');await new Promise(resolve=>server.on('listening',resolve));base='http://127.0.0.1:'+server.address().port;});
+before(async()=>{if(!enabled)return;assert.match(process.env.DATABASE_URL,/\/newsroom_test(?:_[a-f0-9]+)?$/);pool=require('../config/db').pool;User=require('../models/User');await require('../db/migrate')();server=require('../server').app.listen(0,'127.0.0.1');await new Promise(resolve=>server.on('listening',resolve));base='http://127.0.0.1:'+server.address().port;});
 after(async()=>{if(server)await new Promise(resolve=>server.close(resolve));if(pool)await pool.end();});
 test('PostgreSQL CMS: auth, publication lifecycle, moderation, engagement, categories', {skip:!enabled}, async()=>{
  const {runSetup}=require('../scripts/setupAdmin');
@@ -122,7 +122,7 @@ test('first-time setup rejects occupied email and concurrent commands produce on
  await isolated.query('CREATE DATABASE '+database);
  const adminPool=require('../config/db').pool;
  const originalConnect=adminPool.connect.bind(adminPool);
- const setupPool=new Pool({connectionString:process.env.DATABASE_URL.replace(/\/newsroom_test$/,'/'+database)});
+ const setupPool=new Pool({connectionString:process.env.DATABASE_URL.replace(/\/newsroom_test(?:_[a-f0-9]+)?$/,'/'+database)});
  try {
   const schema=await require('fs/promises').readFile(require('path').join(__dirname,'../db/schema.sql'),'utf8');await setupPool.query(schema);
   await setupPool.query('INSERT INTO users(id,name,email,password,role) VALUES($1,$2,$3,$4,$5)',[randomUUID(),'Читатель','occupied@test.local','test-only-unused-hash','user']);
@@ -212,7 +212,7 @@ test('user submissions: immutable authorship, review, rejection/resubmission and
 
 test('additive submission migration preserves pre-existing PostgreSQL posts, authors and comments', {skip:!enabled}, async()=>{
  const {Pool}=require('pg'),{randomUUID}=require('crypto');const database='submission_upgrade_'+randomUUID().replaceAll('-','');await pool.query('CREATE DATABASE '+database);
- const db=new Pool({connectionString:process.env.DATABASE_URL.replace(/\/newsroom_test$/,'/'+database)});
+ const db=new Pool({connectionString:process.env.DATABASE_URL.replace(/\/newsroom_test(?:_[a-f0-9]+)?$/,'/'+database)});
  try {
   const fs=require('fs/promises'),path=require('path');await db.query(await fs.readFile(path.join(__dirname,'../db/schema.sql'),'utf8'));
   const user=randomUUID(),category=randomUUID(),post=randomUUID(),comment=randomUUID();
@@ -225,4 +225,15 @@ test('additive submission migration preserves pre-existing PostgreSQL posts, aut
   const after=(await db.query('SELECT * FROM posts WHERE id=$1',[post])).rows[0];for(const key of Object.keys(before))assert.deepEqual(after[key],before[key]);assert.equal(after.author_user_id,user);assert.equal(after.reviewed_by_admin_id,null);
   assert.equal((await db.query('SELECT content FROM comments WHERE id=$1',[comment])).rows[0].content,'Старый комментарий');assert.equal((await db.query('SELECT password FROM users WHERE id=$1',[user])).rows[0].password,'existing-hash');
  }finally{await db.end();}
+});
+
+test('demonstration seed is repeatable and preserves all existing posts and authors', {skip:!enabled}, async()=>{
+ const baseline=(await pool.query('SELECT * FROM posts ORDER BY id')).rows;
+ const seed=require('../seedData');
+ const previous=process.env.ADMIN_EMAIL;delete process.env.ADMIN_EMAIL;
+ try{await seed();await seed();}finally{if(previous!==undefined)process.env.ADMIN_EMAIL=previous;}
+ const after=(await pool.query('SELECT * FROM posts ORDER BY id')).rows;
+ assert.equal(after.length,baseline.length+6);
+ for(const post of baseline)assert.deepEqual(after.find(row=>row.id===post.id),post);
+ assert.equal((await pool.query('SELECT count(*)::int AS count FROM categories')).rows[0].count,9);
 });

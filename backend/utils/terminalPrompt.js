@@ -33,10 +33,10 @@ function createTerminalPrompt(input = process.stdin, output = process.stdout) {
     ask(message, secret = false) {
       if (closed) return Promise.reject(cancelled());
       hidden = secret;
-      output.write(message);
+      if (secret) output.write(message);
       return new Promise((resolve, reject) => {
         rejectPending = reject;
-        rl.question('', answer => {
+        rl.question(secret ? '' : message, answer => {
           rejectPending = undefined;
           if (secret) output.write('\n');
           // Keep echo muted until readline has finished processing this line.

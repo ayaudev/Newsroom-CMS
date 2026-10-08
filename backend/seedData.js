@@ -17,3 +17,5 @@ async function seed(){
  console.log('Демонстрационные публикации добавлены; существующие записи сохранены');
 }
 if(require.main===module)seed().catch(e=>{console.error(e.message);process.exitCode=1;}).finally(()=>pool.end());
+
+module.exports=seed;
